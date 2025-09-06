@@ -1,6 +1,6 @@
 # IKEA Warehouse Data Consumer
 
-A Spring Boot Kafka consumer application that listens to multiple Kafka topics to persist warehouse data (inventory, products, and warehouse events) into MongoDB. The application provides REST APIs for data management and warehouse analysis.
+A Spring Boot Kafka consumer application that listens to multiple Kafka topics to persist warehouse data (inventory, productDocuments, and warehouse events) into MongoDB. The application provides REST APIs for data management and warehouse analysis.
 
 ## Architecture Overview
 
@@ -15,7 +15,7 @@ This application processes three types of data:
 - 📊 **MongoDB Persistence**: Stores all data in MongoDB with proper indexing
 - 🔍 **REST API**: Comprehensive APIs for data access and warehouse analysis
 - 📈 **Production Analysis**: Calculate manufacturing capacity based on inventory
-- 🏗️ **Product Feasibility**: Check if products can be manufactured with current stock
+- 🏗️ **Product Feasibility**: Check if productDocuments can be manufactured with current stock
 - 📚 **API Documentation**: Auto-generated Swagger/OpenAPI documentation
 - 🔧 **Error Handling**: Robust error handling with raw message preservation
 
@@ -93,8 +93,8 @@ bin/kafka-server-start.sh config/server.properties
 bin/kafka-topics.sh --create --topic warehouse-events --bootstrap-server localhost:9092
 bin/kafka-topics.sh --create --topic inventory-events --bootstrap-server localhost:9092
 bin/kafka-topics.sh --create --topic inventory-updates --bootstrap-server localhost:9092
-bin/kafka-topics.sh --create --topic products-events --bootstrap-server localhost:9092
-bin/kafka-topics.sh --create --topic product-updates --bootstrap-server localhost:9092
+bin/kafka-topics.sh --create --topic productDocuments-events --bootstrap-server localhost:9092
+bin/kafka-topics.sh --create --topic productDocument-updates --bootstrap-server localhost:9092
 ```
 
 ### 2. Configure Application
@@ -115,8 +115,8 @@ spring.kafka.consumer.group-id=warehouse-consumer-group
 spring.kafka.consumer.topic=warehouse-events
 spring.kafka.consumer.inventory-topic=inventory-events
 spring.kafka.consumer.inventory-update-topic=inventory-updates
-spring.kafka.consumer.products-topic=products-events
-spring.kafka.consumer.product-update-topic=product-updates
+spring.kafka.consumer.productDocuments-topic=productDocuments-events
+spring.kafka.consumer.productDocument-update-topic=productDocument-updates
 ```
 
 ### 3. Run the Application
@@ -138,7 +138,7 @@ The application will start on port 8080.
 - `GET /api/warehouse-messages` - Get all warehouse messages (paginated)
 - `GET /api/warehouse-messages/{id}` - Get message by ID
 - `GET /api/warehouse-messages/warehouse/{warehouseId}` - Filter by warehouse
-- `GET /api/warehouse-messages/product/{productId}` - Filter by product
+- `GET /api/warehouse-messages/productDocument/{productId}` - Filter by productDocument
 - `GET /api/warehouse-messages/count` - Get total message count
 
 ### Inventory Management
@@ -150,18 +150,18 @@ The application will start on port 8080.
 - `DELETE /api/inventory/{artId}` - Delete inventory item
 
 ### Product Management
-- `GET /api/products` - Get all products (paginated)
-- `GET /api/products/{id}` - Get product by ID
-- `GET /api/products/search?name={name}` - Search by name
-- `GET /api/products/by-article/{artId}` - Find products using specific article
-- `POST /api/products` - Create/update product
-- `DELETE /api/products/{id}` - Delete product
+- `GET /api/productDocuments` - Get all productDocuments (paginated)
+- `GET /api/productDocuments/{id}` - Get productDocument by ID
+- `GET /api/productDocuments/search?name={name}` - Search by name
+- `GET /api/productDocuments/by-article/{artId}` - Find productDocuments using specific article
+- `POST /api/productDocuments` - Create/update productDocument
+- `DELETE /api/productDocuments/{id}` - Delete productDocument
 
 ### Warehouse Analysis
-- `GET /api/analysis/can-manufacture/{productId}` - Check if product can be manufactured
+- `GET /api/analysis/can-manufacture/{productId}` - Check if productDocument can be manufactured
 - `GET /api/analysis/production-capacity/{productId}` - Calculate max production quantity
-- `GET /api/analysis/manufacturable-products` - Get all manufacturable products
-- `GET /api/analysis/inventory-status/{productId}` - Detailed inventory status for product
+- `GET /api/analysis/manufacturable-productDocuments` - Get all manufacturable productDocuments
+- `GET /api/analysis/inventory-status/{productId}` - Detailed inventory status for productDocument
 
 ### Health & Documentation
 - `GET /api/warehouse-messages/health` - Application health check
@@ -186,8 +186,8 @@ kafka-console-producer.sh --topic inventory-events --bootstrap-server localhost:
 
 #### Product Definition
 ```bash
-echo '{"products":[{"id":"TABLE001","name":"Dining Table","contain_articles":[{"art_id":"1","amount_of":"4"},{"art_id":"2","amount_of":"1"}]}]}' | \
-kafka-console-producer.sh --topic products-events --bootstrap-server localhost:9092
+echo '{"productDocuments":[{"id":"TABLE001","name":"Dining Table","contain_articles":[{"art_id":"1","amount_of":"4"},{"art_id":"2","amount_of":"1"}]}]}' | \
+kafka-console-producer.sh --topic productDocuments-events --bootstrap-server localhost:9092
 ```
 
 ### REST API Usage
@@ -200,7 +200,7 @@ Response: `12` (can manufacture 12 tables with current inventory)
 
 #### Get Manufacturable Products
 ```bash
-curl http://localhost:8080/api/analysis/manufacturable-products
+curl http://localhost:8080/api/analysis/manufacturable-productDocuments
 ```
 
 #### Add Inventory Item

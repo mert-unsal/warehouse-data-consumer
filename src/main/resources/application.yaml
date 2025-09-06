@@ -1,0 +1,58 @@
+# Default/Common Configuration
+spring:
+  application:
+    name: warehouse-data-consumer
+  profiles:
+    active: default,logging,management,kafka,mongo
+
+# OpenAPI/Swagger Configuration
+springdoc:
+  api-docs:
+    path: /api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+    enabled: true
+    operations-sorter: method
+    tags-sorter: alpha
+
+# Server Configuration
+server:
+  port: ${PORT:8080}
+  servlet:
+    context-path: /
+
+# Application Information
+info:
+  app:
+    name: ${spring.application.name}
+    description: Warehouse Data Consumer Service for IKEA
+    version: '@project.version@'
+    encoding: '@project.build.sourceEncoding@'
+    java:
+      version: '@java.version@'
+
+otel:
+  resource:
+    attributes:
+      deployment.environment: ${ACTIVE_PROFILE:dev}
+      service:
+        name: ${OTEL_SERVICE_NAME:warehouse-data-ingestion-service}
+        namespace: ${OTEL_SERVICE_NAMESPACE:ikea-dev}
+  exporter:
+    otlp:
+      endpoint: ""
+      compression: ${OTEL_EXPORTER_OTLP_METRICS_COMPRESSION:gzip}
+      protocol: ${OTEL_EXPORTER_OTLP_PROTOCOL:http/protobuf}
+  instrumentation:
+    kafka:
+      enabled: true
+      autoconfigure-interceptor: true
+      experimental-span-attributes: true
+  traces:
+    exporter: none #console
+    sampler.arg: ${OTEL_TRACES_SAMPLER_ARG:0.1}
+    sampler: always_on
+  logs:
+    exporter: none #console
+  metrics:
+    exporter: none #console

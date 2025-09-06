@@ -1,0 +1,15 @@
+# MongoDB Configuration Profile
+spring:
+  data:
+    mongodb:
+      # Prefer URI; overrides host/port if provided
+      uri: ${MONGODB_URI:mongodb+srv://mertunsal0_db_user:8rRqh7a8mefQinqH@munsalcluster.gab6lus.mongodb.net/?retryWrites=true&w=majority&appName=munsalCluster}
+      database: ${MONGODB_DATABASE:ikea}
+
+# Expose MongoDB health indicator explicitly when management profile is not active
+management:
+  health:
+    mongo:
+      enabled: true
+
+

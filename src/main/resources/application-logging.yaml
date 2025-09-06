@@ -1,0 +1,12 @@
+# Logging Configuration Profile
+logging:
+  level:
+    com.ikea.warehouse_data_ingestion_service: INFO
+    org.springframework.web.multipart: DEBUG
+    org.springframework.kafka: INFO
+    org.apache.kafka: WARN
+    org.springframework.web: INFO
+#  pattern:
+#    console: "%d{HH:mm:ss.SSS} [%thread] %-5level [%X{traceId:-}] [%X{operation:-}] %logger{36} - %msg%n"
+#    file: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level [%X{traceId:-}] [%X{operation:-}] %logger{50} - %msg%n"
+

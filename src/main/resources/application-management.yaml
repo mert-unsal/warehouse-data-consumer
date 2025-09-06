@@ -1,0 +1,13 @@
+# Management/Actuator Configuration Profile
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,env,configprops,loggers
+      base-path: /actuator
+  endpoint:
+    health:
+      show-details: always
+      show-components: always
+    info:
+      enabled: true

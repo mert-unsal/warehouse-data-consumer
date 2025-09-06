@@ -1,0 +1,38 @@
+# Kafka Configuration with OpenTelemetry instrumentation
+spring:
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+      acks: all
+      retries: 3
+      batch-size: 16384
+      linger-ms: 1
+      buffer-memory: 33554432
+      properties:
+        enable.idempotence: true
+        max.in.flight.requests.per.connection: 5
+    consumer:
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
+      group-id: ${KAFKA_CONSUMER_GROUP_ID:warehouse-data-ingestion-group}
+      auto-offset-reset: earliest
+      enable-auto-commit: false
+      properties:
+        spring.json.trusted.packages: "com.ikea.warehouse_data_ingestion_service.data.event,com.ikea.warehouse_data_consumer.data.event,java.util,java.lang"
+
+app:
+  kafka:
+    topics:
+      # Primary topics - using your existing naming convention
+      product: ${KAFKA_TOPIC_PRODUCT:ikea.warehouse.product.update.topic}
+      inventory: ${KAFKA_TOPIC_INVENTORY:ikea.warehouse.inventory.update.topic}
+      # Error handling topics
+      product-error: ${KAFKA_TOPIC_PRODUCT_ERROR:ikea.warehouse.product.update.topic.error}
+      product-retry: ${KAFKA_TOPIC_PRODUCT_RETRY:ikea.warehouse.product.update.topic.retry}
+      inventory-error: ${KAFKA_TOPIC_INVENTORY_ERROR:ikea.warehouse.inventory.update.topic.error}
+      inventory-retry: ${KAFKA_TOPIC_INVENTORY_RETRY:ikea.warehouse.inventory.update.topic.retry}
+    retry:
+      attempts: 3
+      backoff-delay: 1000
