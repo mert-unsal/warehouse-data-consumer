@@ -1,6 +1,7 @@
 package com.ikea.warehouse_data_consumer.consumer;
 
 import com.ikea.warehouse_data_consumer.data.event.InventoryUpdateEvent;
+import com.ikea.warehouse_data_consumer.data.exception.CustomMongoWriteException;
 import com.ikea.warehouse_data_consumer.service.InventoryService;
 import lombok.RequiredArgsConstructor;
 import org.apache.commons.lang3.ObjectUtils;
@@ -41,13 +42,13 @@ public class InventoryEventConsumer {
             topics = "${KAFKA_TOPIC_INVENTORY:ikea.warehouse.inventory.update.topic}",
             containerFactory = "kafkaListenerContainerFactoryInventory"
     )
-    public void consume(InventoryUpdateEvent event, Acknowledgment ack) {
-        if (event == null || event.inventory() == null || event.inventory().isEmpty()) {
-            log.warn("Received empty inventory update event; acking.");
+    public void consume(List<InventoryUpdateEvent> inventoryUpdateEventList, Acknowledgment ack) {
+        if (ObjectUtils.isEmpty(inventoryUpdateEventList)){
+            log.warn("Received empty inventory update inventoryUpdateEventList; acking.");
             ack.acknowledge();
             return;
         }
-        inventoryService.process(event);
+        inventoryService.process(inventoryUpdateEventList);
         ack.acknowledge();
     }
 
