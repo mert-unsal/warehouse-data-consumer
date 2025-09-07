@@ -2,68 +2,61 @@ package com.ikea.warehouse_data_consumer.service;
 
 import com.ikea.warehouse_data_consumer.data.document.ArticleDocument;
 import com.ikea.warehouse_data_consumer.data.event.InventoryUpdateEvent;
+import com.ikea.warehouse_data_consumer.data.exception.CustomMongoWriteException;
+import com.mongodb.MongoBulkWriteException;
+import com.mongodb.bulk.BulkWriteError;
+import com.mongodb.bulk.BulkWriteResult;
+import com.mongodb.client.model.*;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.data.mongodb.core.BulkOperations;
+import org.apache.commons.lang3.ObjectUtils;
+import org.bson.Document;
+import org.bson.conversions.Bson;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.data.mongodb.core.MongoTemplate;
-import org.springframework.data.mongodb.core.query.Criteria;
-import org.springframework.data.mongodb.core.query.Query;
-import org.springframework.data.mongodb.core.query.Update;
-import org.springframework.retry.annotation.Backoff;
-import org.springframework.retry.annotation.Retryable;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
+import java.util.ArrayList;
 import java.util.List;
 
-@Slf4j
 @Service
 @RequiredArgsConstructor
 public class InventoryService {
-
     private final MongoTemplate mongoTemplate;
+    private static final Logger log = LoggerFactory.getLogger(InventoryService.class);
 
-    @Value("${app.kafka.retry.attempts:3}")
-    private int retryAttempts;
+    public void process(List<InventoryUpdateEvent> eventList) {
 
-    @Value("${app.kafka.retry.backoff-delay:1000}")
-    private long backoffDelay;
+        List<WriteModel<Document>> bulkOperations = new ArrayList<>();
+        List<InventoryUpdateEvent> failedEvents = new ArrayList<>();
 
-    @Transactional
-    @Retryable(maxAttemptsExpression = "#{${app.kafka.retry.attempts:3}}",
-            backoff = @Backoff(delayExpression = "#{${app.kafka.retry.backoff-delay:1000}}", multiplier = 2.0))
-    public void process(InventoryUpdateEvent event) {
-        BulkOperations bulkOps = mongoTemplate.bulkOps(BulkOperations.BulkMode.UNORDERED, ArticleDocument.class);
-        List<ArticleDocument> items = event.inventory();
-        for (ArticleDocument item : items) {
-            Query query = Query.query(Criteria.where("_id").is(item.id()));
-            if (item.lastMessageId() != null && !item.lastMessageId().isBlank()) {
-                query.addCriteria(new Criteria().orOperator(
-                    Criteria.where("lastMessageId").ne(item.lastMessageId()),
-                    Criteria.where("lastMessageId").exists(false)
+        try {
+            if (ObjectUtils.isEmpty(eventList)) {
+                log.warn("Received empty inventory update event list; skipping processing.");
+                return;
+            }
+
+            for (InventoryUpdateEvent event : eventList) {
+                Bson updates = Updates.combine(
+                        Updates.set("name", event.name()),
+                        Updates.set("stock", event.stock()),
+                        Updates.set("fileCreatedAt", event.fileCreatedAt())
+                );
+
+                bulkOperations.add(new UpdateOneModel<>(
+                        Filters.and(Filters.eq("_id", event.artId()), Filters.lt("fileCreatedAt", event.fileCreatedAt())),
+                        updates,
+                        new UpdateOptions()
                 ));
             }
-
-            Update update = new Update()
-                .set("name", item.name())
-                .set("stock", item.stock());
-
-            if (item.lastMessageId() != null && !item.lastMessageId().isBlank()) {
-                update.set("lastMessageId", item.lastMessageId());
+            mongoTemplate.getCollection(mongoTemplate.getCollectionName(ArticleDocument.class)).bulkWrite(bulkOperations, new BulkWriteOptions().ordered(false));
+        } catch (MongoBulkWriteException mongoBulkWriteException) {
+            for (BulkWriteError bulkWriteError : mongoBulkWriteException.getWriteErrors()) {
+                int index = bulkWriteError.getIndex();
+                InventoryUpdateEvent event = eventList.get(index);
+                failedEvents.add(event);
             }
-
-            if (item.version() == null) {
-                update.setOnInsert("_id", item.id());
-                update.setOnInsert("version", 0L);
-                bulkOps.upsert(query, update);
-            } else {
-                query.addCriteria(Criteria.where("version").is(item.version()));
-                update.inc("version", 1);
-                bulkOps.updateOne(query, update);
-            }
+            throw new CustomMongoWriteException(failedEvents);
         }
-        bulkOps.execute();
-        log.info("Persisted {} inventory items with timestamp {}", event.inventory().size(), event.timestamp());
     }
 }

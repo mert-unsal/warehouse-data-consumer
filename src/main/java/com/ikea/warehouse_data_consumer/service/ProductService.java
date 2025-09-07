@@ -3,7 +3,8 @@ package com.ikea.warehouse_data_consumer.service;
 import com.ikea.warehouse_data_consumer.data.document.ProductDocument;
 import com.ikea.warehouse_data_consumer.data.event.ProductUpdateEvent;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.mongodb.core.BulkOperations;
 import org.springframework.data.mongodb.core.MongoTemplate;
@@ -17,10 +18,11 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 
-@Slf4j
 @Service
 @RequiredArgsConstructor
 public class ProductService {
+
+    private static final Logger log = LoggerFactory.getLogger(ProductService.class);
 
     private final MongoTemplate mongoTemplate;
 

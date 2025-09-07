@@ -10,15 +10,24 @@ spring:
       batch-size: 16384
       linger-ms: 1
       buffer-memory: 33554432
-      properties:
-        enable.idempotence: true
-        max.in.flight.requests.per.connection: 5
+      enable.idempotence: true
+      max.in.flight.requests.per.connection: 5
+      concurrency: 4
     consumer:
       key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
       value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
-      group-id: ${KAFKA_CONSUMER_GROUP_ID:warehouse-data-ingestion-group}
+      group-id: ${KAFKA_CONSUMER_GROUP_ID:warehouse-data-ingestion-group-mert}
       auto-offset-reset: earliest
       enable-auto-commit: false
+      max-poll-records: 1000
+      fetch-max-wait: 10
+      max-poll-interval-ms: 300000
+      fetch-min-bytes: 4096
+      auto-commit-interval: 10000
+      enable.auto-commit: true
+      concurrency: 4
+      ack-mode: BATCH
+      batch-listener: true
       properties:
         spring.json.trusted.packages: "com.ikea.warehouse_data_ingestion_service.data.event,com.ikea.warehouse_data_consumer.data.event,java.util,java.lang"
 

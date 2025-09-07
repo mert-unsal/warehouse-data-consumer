@@ -1,9 +1,11 @@
 package com.ikea.warehouse_data_consumer.data.document;
 
-import com.fasterxml.jackson.annotation.JsonProperty;
 import io.swagger.v3.oas.annotations.media.Schema;
 import org.bson.types.ObjectId;
-import org.springframework.data.annotation.*;
+import org.springframework.data.annotation.CreatedDate;
+import org.springframework.data.annotation.Id;
+import org.springframework.data.annotation.LastModifiedDate;
+import org.springframework.data.annotation.Version;
 import org.springframework.data.mongodb.core.index.Indexed;
 import org.springframework.data.mongodb.core.mapping.Document;
 
@@ -36,9 +38,5 @@ public record ArticleDocument(
     @LastModifiedDate
     Instant lastModifiedDate,
 
-    @CreatedBy
-    String createdBy,
-
-    @LastModifiedBy
-    String lastModifiedBy
+    Instant fileCreatedAt
 ) {}
