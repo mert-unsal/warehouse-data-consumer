@@ -1,9 +1,7 @@
 package com.ikea.warehouse_data_consumer.data.exception;
 
 import com.ikea.warehouse_data_consumer.data.event.InventoryUpdateEvent;
-import com.mongodb.client.model.WriteModel;
 import lombok.Getter;
-import org.bson.Document;
 import org.springframework.http.HttpStatus;
 
 import java.util.List;
@@ -18,10 +16,14 @@ import static com.ikea.warehouse_data_consumer.util.ExceptionMessageUtil.MONGO_W
 @Getter
 public class CustomMongoWriteException extends BaseException {
     private final List<InventoryUpdateEvent> failedEvents;
-    public <T> CustomMongoWriteException(List<InventoryUpdateEvent> failedEvents) {
+    private final List<InventoryUpdateEvent> criteriaNotMatchedEvents;
+
+    public <T> CustomMongoWriteException(List<InventoryUpdateEvent> failedEvents,  List<InventoryUpdateEvent> criteriaNotMatchedEvents) {
         super(HttpStatus.BAD_REQUEST, MONGO_WRITE_EXCEPTION);
         this.failedEvents = failedEvents;
+        this.criteriaNotMatchedEvents = criteriaNotMatchedEvents;
     }
+
 }
 
 

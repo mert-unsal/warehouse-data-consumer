@@ -34,7 +34,6 @@ public record KafkaConfigurationProperties(String bootstrapServers,
                                            int autoCommitInterval,
                                            String ackMode,
                                            int concurrency,
-                                           boolean batchListener,
                                            Map<String, Object> properties
     ) {}
 };

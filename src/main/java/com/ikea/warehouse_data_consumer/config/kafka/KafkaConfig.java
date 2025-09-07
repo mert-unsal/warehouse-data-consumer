@@ -84,13 +84,35 @@ public class KafkaConfig {
     }
 
     @Bean
+    public ConcurrentKafkaListenerContainerFactory<String, ProductUpdateEvent> batchKafkaListenerContainerFactoryProduct() {
+        ConcurrentKafkaListenerContainerFactory<String, ProductUpdateEvent> factory =
+            new ConcurrentKafkaListenerContainerFactory<>();
+        factory.setConsumerFactory(productConsumerFactory());
+        factory.getContainerProperties().setAckMode(ContainerProperties.AckMode.MANUAL_IMMEDIATE);
+        factory.setConcurrency(kafkaConfigurationProperties.consumer().concurrency());
+        factory.setBatchListener(Boolean.TRUE);
+        return factory;
+    }
+
+    @Bean
     public ConcurrentKafkaListenerContainerFactory<String, ProductUpdateEvent> kafkaListenerContainerFactoryProduct() {
         ConcurrentKafkaListenerContainerFactory<String, ProductUpdateEvent> factory =
             new ConcurrentKafkaListenerContainerFactory<>();
         factory.setConsumerFactory(productConsumerFactory());
         factory.getContainerProperties().setAckMode(ContainerProperties.AckMode.MANUAL_IMMEDIATE);
         factory.setConcurrency(kafkaConfigurationProperties.consumer().concurrency());
-        factory.setBatchListener(kafkaConfigurationProperties.consumer().batchListener());
+        factory.setBatchListener(Boolean.FALSE);
+        return factory;
+    }
+
+    @Bean
+    public ConcurrentKafkaListenerContainerFactory<String, InventoryUpdateEvent> batchKafkaListenerContainerFactoryInventory() {
+        ConcurrentKafkaListenerContainerFactory<String, InventoryUpdateEvent> factory =
+            new ConcurrentKafkaListenerContainerFactory<>();
+        factory.setConsumerFactory(inventoryConsumerFactory());
+        factory.getContainerProperties().setAckMode(ContainerProperties.AckMode.MANUAL_IMMEDIATE);
+        factory.setConcurrency(kafkaConfigurationProperties.consumer().concurrency());
+        factory.setBatchListener(Boolean.TRUE);
         return factory;
     }
 
@@ -101,7 +123,7 @@ public class KafkaConfig {
         factory.setConsumerFactory(inventoryConsumerFactory());
         factory.getContainerProperties().setAckMode(ContainerProperties.AckMode.MANUAL_IMMEDIATE);
         factory.setConcurrency(kafkaConfigurationProperties.consumer().concurrency());
-        factory.setBatchListener(kafkaConfigurationProperties.consumer().batchListener());
+        factory.setBatchListener(Boolean.FALSE);
         return factory;
     }
 }

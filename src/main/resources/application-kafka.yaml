@@ -27,7 +27,6 @@ spring:
       enable.auto-commit: true
       concurrency: 4
       ack-mode: BATCH
-      batch-listener: true
       properties:
         spring.json.trusted.packages: "com.ikea.warehouse_data_ingestion_service.data.event,com.ikea.warehouse_data_consumer.data.event,java.util,java.lang"
 
