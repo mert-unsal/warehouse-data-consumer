@@ -10,6 +10,7 @@ import org.springframework.stereotype.Service;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 
 @Slf4j
@@ -25,7 +26,7 @@ public class KafkaProducerService {
                 CompletableFuture<SendResult<String, Object>> completableFuture = kafkaTemplate.send(topic, key, event);
                 futures.add(completableFuture);
                 completableFuture.whenComplete((stringObjectSendResult, throwable) -> {
-                    if (throwable != null) {
+                    if (Objects.nonNull(throwable)) {
                         log.error("Sending kafka message failed with the following exception : {}, topic : {}, event: {}", throwable.getMessage(), topic, event);
                         throw new KafkaProduceFailedException(throwable.getMessage(), throwable);
                     }

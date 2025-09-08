@@ -3,6 +3,7 @@ package com.ikea.warehouse_data_consumer.service;
 import com.ikea.warehouse_data_consumer.data.document.ProductDocument;
 import com.ikea.warehouse_data_consumer.data.event.ProductUpdateEvent;
 import com.ikea.warehouse_data_consumer.data.exception.ProductDocumentMongoWriteException;
+import com.ikea.warehouse_data_consumer.service.builder.ProductBulkOperationBuilder;
 import com.mongodb.MongoBulkWriteException;
 import com.mongodb.bulk.BulkWriteError;
 import com.mongodb.bulk.BulkWriteResult;
@@ -42,7 +43,7 @@ public class ProductService {
 
         UpdateOptions options = new UpdateOptions().upsert(true);
 
-        mongoTemplate.getCollection(mongoTemplate.getCollectionName(ProductUpdateEvent.class))
+        mongoTemplate.getCollection(mongoTemplate.getCollectionName(ProductDocument.class))
                 .updateOne(filter, update, options);
 
     }
@@ -57,20 +58,8 @@ public class ProductService {
                 return;
             }
 
-            for (ProductUpdateEvent productUpdateEvent : productUpdateEventList) {
-                Bson updates = Updates.combine(
-                        Updates.set("name", productUpdateEvent.name()),
-                        Updates.set("containArticles", productUpdateEvent.containArticles()),
-                        Updates.set("fileCreatedAt", productUpdateEvent.fileCreatedAt())
-                );
-
-                bulkOperations.add(new UpdateOneModel<>(
-                        Filters.and(Filters.eq("name", productUpdateEvent.name()),
-                                    Filters.lt("fileCreatedAt", productUpdateEvent.fileCreatedAt())),
-                        updates,
-                        new UpdateOptions().upsert(true)
-                ));
-            }
+            // Delegate building of bulk operations to a dedicated builder for testability
+            bulkOperations = new ProductBulkOperationBuilder().build(productUpdateEventList);
 
             BulkWriteResult bulkWriteResult = mongoTemplate.getCollection(mongoTemplate.getCollectionName(ProductDocument.class))
                                                     .bulkWrite(bulkOperations, new BulkWriteOptions().ordered(false));

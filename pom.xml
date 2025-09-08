@@ -27,7 +27,7 @@
         <springdoc.version>2.2.0</springdoc.version>
         <opentelemetry.version.internal>2.13.1</opentelemetry.version.internal>
         <logstash-logback-encoder.version>7.4</logstash-logback-encoder.version>
-        <maven.test.skip>true</maven.test.skip>
+        <maven.test.skip>false</maven.test.skip>
     </properties>
 
     <dependencyManagement>
@@ -141,7 +141,7 @@
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-surefire-plugin</artifactId>
                 <configuration>
-                    <skipTests>true</skipTests>
+                    <skipTests>false</skipTests>
                     <excludes>
                         <exclude>**/WarehouseMessageConsumerTest.java</exclude>
                     </excludes>

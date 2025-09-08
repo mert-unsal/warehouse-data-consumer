@@ -54,19 +54,8 @@ public class InventoryService {
                 return;
             }
 
-            for (InventoryUpdateEvent event : eventList) {
-                Bson updates = Updates.combine(
-                        Updates.set("name", event.name()),
-                        Updates.set("stock", event.stock()),
-                        Updates.set("fileCreatedAt", event.fileCreatedAt())
-                );
-
-                bulkOperations.add(new UpdateOneModel<>(
-                        Filters.and(Filters.eq("_id", event.artId()), Filters.lt("fileCreatedAt", event.fileCreatedAt())),
-                        updates,
-                        new UpdateOptions().upsert(true)
-                ));
-            }
+            // Delegate building of bulk operations to a dedicated builder for testability
+            bulkOperations = new com.ikea.warehouse_data_consumer.service.builder.InventoryBulkOperationBuilder().build(eventList);
 
             BulkWriteResult bulkWriteResult = mongoTemplate.getCollection(mongoTemplate.getCollectionName(ArticleDocument.class)).bulkWrite(bulkOperations, new BulkWriteOptions().ordered(false));
 
