@@ -1,7 +1,7 @@
-package com.ikea.warehouse_data_consumer.consumer;
+package com.ikea.warehouse_data_consumer.consumer.inventory;
 
 import com.ikea.warehouse_data_consumer.data.event.InventoryUpdateEvent;
-import com.ikea.warehouse_data_consumer.data.exception.CustomMongoWriteException;
+import com.ikea.warehouse_data_consumer.data.exception.ArticleDocumentMongoWriteException;
 import com.ikea.warehouse_data_consumer.service.InventoryService;
 import com.ikea.warehouse_data_consumer.service.KafkaProducerService;
 import lombok.RequiredArgsConstructor;
@@ -27,19 +27,19 @@ public class InventoryEventConsumer {
     private final InventoryService inventoryService;
     private final KafkaProducerService kafkaProducerService;
 
-    @Value("${app.kafka.topics.inventory-retry}")
+    @Value("${app.kafka.consumer.inventory.retryTopic}")
     private String retryTopic;
 
-    @Value("${app.kafka.topics.inventory-error}")
+    @Value("${app.kafka.consumer.inventory.errorTopic}")
     private String errorTopic;
 
     @Retryable(
-            noRetryFor = {CustomMongoWriteException.class},
+            noRetryFor = {ArticleDocumentMongoWriteException.class},
             maxAttempts = 3,
             backoff = @Backoff(delay = 50, multiplier = 2.0)
     )
     @KafkaListener(
-            topics = "${KAFKA_TOPIC_INVENTORY:ikea.warehouse.inventory.update.topic}",
+            topics = "${app.kafka.consumer.inventory.topic}",
             containerFactory = "batchKafkaListenerContainerFactoryInventory"
     )
     public void consume(List<InventoryUpdateEvent> inventoryUpdateEventList, Acknowledgment ack) {
@@ -48,28 +48,29 @@ public class InventoryEventConsumer {
             ack.acknowledge();
             return;
         }
-        inventoryService.persistEventList(inventoryUpdateEventList);
-        ack.acknowledge();
-    }
+        try {
+            inventoryService.proceedInventoryUpdateBatchEvent(inventoryUpdateEventList);
+            ack.acknowledge();
+        } catch (ArticleDocumentMongoWriteException ex) {
+            // Handle known business exception locally to prevent container-level retries
+            Map<String, InventoryUpdateEvent> retryableEventMap = ex.getFailedEvents()
+                    .stream()
+                    .collect(Collectors.toMap(InventoryUpdateEvent::artId, event -> event));
 
-    @Recover
-    public void recover(CustomMongoWriteException customMongoWriteException, List<InventoryUpdateEvent> eventList, Acknowledgment ack) {
-        log.error("Recovering from CustomMongoWriteException; events size={}",
-                ObjectUtils.isEmpty(eventList) ? 0 : eventList.size(), customMongoWriteException);
+            Map<String, InventoryUpdateEvent> nonRetryableEventMap = ex.getCriteriaNotMatchedEvents()
+                    .stream()
+                    .collect(Collectors.toMap(InventoryUpdateEvent::artId, event -> event));
 
-        Map<String, InventoryUpdateEvent> retryableEventMap = customMongoWriteException.
-                getFailedEvents()
-                .stream()
-                .collect(Collectors.toMap(InventoryUpdateEvent::artId, event -> event));
+            log.error("Recovering from CustomMongoWriteException; with retryable event size={}, non-retryable event size={}",
+                    ObjectUtils.isEmpty(retryableEventMap) ? 0 : retryableEventMap.size(),
+                    ObjectUtils.isEmpty(nonRetryableEventMap) ? 0 : nonRetryableEventMap.size(),
+                    ex);
 
-        Map<String, InventoryUpdateEvent> nonRetryableEventMap = customMongoWriteException.
-                getCriteriaNotMatchedEvents()
-                .stream()
-                .collect(Collectors.toMap(InventoryUpdateEvent::artId, event -> event));
-
-        kafkaProducerService.sendBatch(retryTopic, retryableEventMap);
-        kafkaProducerService.sendBatch(errorTopic, nonRetryableEventMap);
-        ack.acknowledge();
+            kafkaProducerService.sendBatch(retryTopic, retryableEventMap);
+            kafkaProducerService.sendBatch(errorTopic, nonRetryableEventMap);
+        } finally {
+            ack.acknowledge();
+        }
     }
 
     @Recover

@@ -36,4 +36,6 @@ public record KafkaConfigurationProperties(String bootstrapServers,
                                            int concurrency,
                                            Map<String, Object> properties
     ) {}
+
+
 };

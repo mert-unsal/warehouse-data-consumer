@@ -1,4 +1,4 @@
-package com.ikea.warehouse_data_consumer.consumer;
+package com.ikea.warehouse_data_consumer.consumer.inventory;
 
 import com.ikea.warehouse_data_consumer.data.event.InventoryUpdateEvent;
 import com.ikea.warehouse_data_consumer.service.InventoryService;
@@ -21,10 +21,7 @@ public class InventoryEventRetryConsumer {
     private final InventoryService inventoryService;
     private final KafkaProducerService kafkaProducerService;
 
-    @Value("${app.kafka.topics.inventory-retry}")
-    private String retryTopic;
-
-    @Value("${app.kafka.topics.inventory-error}")
+    @Value("${app.kafka.consumer.inventory.errorTopic}")
     private String errorTopic;
 
     @Retryable(
@@ -32,17 +29,17 @@ public class InventoryEventRetryConsumer {
             backoff = @Backoff(delay = 50, multiplier = 2.0)
     )
     @KafkaListener(
-            topics = "${KAFKA_TOPIC_INVENTORY_RETRY:ikea.warehouse.inventory.update.topic.retry}",
+            topics = "${app.kafka.consumer.inventory.retryTopic}",
             containerFactory = "kafkaListenerContainerFactoryInventory"
     )
     public void consume(InventoryUpdateEvent inventoryUpdateEvent, Acknowledgment ack) {
-        inventoryService.persistEvent(inventoryUpdateEvent);
+        inventoryService.proceedInventoryUpdateEvent(inventoryUpdateEvent);
         ack.acknowledge();
     }
 
     @Recover
-    public void recover(Exception e, InventoryUpdateEvent inventoryUpdateEvent, Acknowledgment ack) {
-        log.error("InventoryEventRetryConsumer recover exception", e);
+    public void recover(Exception exception, InventoryUpdateEvent inventoryUpdateEvent, Acknowledgment ack) {
+        log.error("InventoryEventRetryConsumer recover exception", exception);
         kafkaProducerService.send(errorTopic, inventoryUpdateEvent.artId(), inventoryUpdateEvent);
         ack.acknowledge();
     }
