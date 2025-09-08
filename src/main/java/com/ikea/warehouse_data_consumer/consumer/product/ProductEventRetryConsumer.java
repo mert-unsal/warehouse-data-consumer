@@ -1,7 +1,6 @@
 package com.ikea.warehouse_data_consumer.consumer.product;
 
 import com.ikea.warehouse_data_consumer.data.event.ProductUpdateEvent;
-import com.ikea.warehouse_data_consumer.data.event.ProductUpdateEvent;
 import com.ikea.warehouse_data_consumer.service.KafkaProducerService;
 import com.ikea.warehouse_data_consumer.service.ProductService;
 import lombok.RequiredArgsConstructor;

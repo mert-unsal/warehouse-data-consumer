@@ -1,5 +1,6 @@
 package com.ikea.warehouse_data_consumer.service.builder;
 
+import com.ikea.warehouse_data_consumer.builder.ProductBulkOperationBuilder;
 import com.ikea.warehouse_data_consumer.data.dto.ArticleAmount;
 import com.ikea.warehouse_data_consumer.data.event.ProductUpdateEvent;
 import com.mongodb.client.model.UpdateOneModel;

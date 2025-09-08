@@ -1,11 +1,7 @@
-package com.ikea.warehouse_data_consumer.service.builder;
+package com.ikea.warehouse_data_consumer.builder;
 
 import com.ikea.warehouse_data_consumer.data.event.ProductUpdateEvent;
-import com.mongodb.client.model.UpdateOneModel;
-import com.mongodb.client.model.UpdateOptions;
-import com.mongodb.client.model.Filters;
-import com.mongodb.client.model.Updates;
-import com.mongodb.client.model.WriteModel;
+import com.mongodb.client.model.*;
 import org.apache.commons.lang3.ObjectUtils;
 import org.bson.Document;
 import org.bson.conversions.Bson;

@@ -8,7 +8,7 @@ import java.time.Instant;
 import java.util.List;
 
 import static com.ikea.warehouse_data_consumer.util.ExceptionMessageUtil.MONGO_WRITE_EXCEPTION;
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 class ProductDocumentMongoWriteExceptionTest {
 

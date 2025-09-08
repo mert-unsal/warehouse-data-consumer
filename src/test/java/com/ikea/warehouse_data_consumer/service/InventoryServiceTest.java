@@ -34,6 +34,9 @@ class InventoryServiceTest {
     @Mock
     MongoCollection<Document> collection;
 
+    @Mock
+    com.mongodb.client.FindIterable<Document> findIterable;
+
     @InjectMocks
     InventoryService inventoryService;
 
@@ -44,16 +47,40 @@ class InventoryServiceTest {
         collectionName = "articleDocument";
         lenient().when(mongoTemplate.getCollectionName(ArticleDocument.class)).thenReturn(collectionName);
         lenient().when(mongoTemplate.getCollection(collectionName)).thenReturn(collection);
+        // Default stubs for find() chain used by version prefetch and batch prefetch
+        lenient().when(collection.find(any(Bson.class))).thenReturn(findIterable);
+        lenient().when(findIterable.projection(any())).thenReturn(findIterable);
+        // By default, no existing doc
+        lenient().when(findIterable.first()).thenReturn(null);
+        // For batch prefetch, do nothing on forEach
+        lenient().doAnswer(inv -> null).when(findIterable).forEach(any());
     }
 
     @Test
     void proceedInventoryUpdateEvent_shouldCallUpdateOneWithUpsert() {
-        InventoryUpdateEvent event = new InventoryUpdateEvent("1", "art", "10", Instant.parse("2024-01-01T00:00:00Z"));
+            InventoryUpdateEvent event = new InventoryUpdateEvent("1", "art", "10", Instant.parse("2024-01-01T00:00:00Z"));
 
-        inventoryService.proceedInventoryUpdateEvent(event);
+            inventoryService.proceedInventoryUpdateEvent(event);
 
-        verify(collection, times(1)).updateOne(any(Bson.class), any(Bson.class), argThat(opt -> opt.isUpsert()));
-    }
+            verify(collection, times(1)).updateOne(any(Bson.class), any(Bson.class), argThat(opt -> opt.isUpsert()));
+        }
+
+        @Test
+        void proceedInventoryUpdateEvent_shouldIncludeVersionOperatorsInUpdate() {
+            InventoryUpdateEvent event = new InventoryUpdateEvent("1", "art", "10", Instant.parse("2024-01-01T00:00:00Z"));
+
+            inventoryService.proceedInventoryUpdateEvent(event);
+
+            // Capture the update Bson
+            org.mockito.ArgumentCaptor<Bson> updateCaptor = org.mockito.ArgumentCaptor.forClass(Bson.class);
+            verify(collection).updateOne(any(Bson.class), updateCaptor.capture(), any());
+            Bson update = updateCaptor.getValue();
+            assertNotNull(update);
+            org.bson.BsonDocument bson = update.toBsonDocument(Document.class, com.mongodb.MongoClientSettings.getDefaultCodecRegistry());
+            org.bson.BsonDocument inc = bson.getDocument("$inc");
+            assertNotNull(inc);
+            assertEquals(new org.bson.BsonInt64(1L), inc.get("version"));
+        }
 
     @Test
     void proceedInventoryUpdateBatchEvent_shouldReturnWhenListEmpty() {
@@ -98,5 +125,20 @@ class InventoryServiceTest {
                 () -> inventoryService.proceedInventoryUpdateBatchEvent(List.of(e1, e2)));
         assertEquals(List.of(e2), ex.getFailedEvents());
         assertTrue(ex.getCriteriaNotMatchedEvents().containsAll(List.of(e1, e2)));
+    }
+
+    @Test
+    void proceedInventoryUpdateEvent_shouldThrowOptimisticLockWhenVersionMismatch() {
+        org.bson.Document existing = new org.bson.Document("_id", "1").append("version", 2L);
+        when(collection.find(any(Bson.class))).thenReturn(findIterable);
+        when(findIterable.projection(any())).thenReturn(findIterable);
+        when(findIterable.first()).thenReturn(existing);
+
+        com.mongodb.client.result.UpdateResult updateResult = com.mongodb.client.result.UpdateResult.acknowledged(0L, 0L, null);
+        when(collection.updateOne(any(Bson.class), any(Bson.class), any(com.mongodb.client.model.UpdateOptions.class))).thenReturn(updateResult);
+
+        InventoryUpdateEvent event = new InventoryUpdateEvent("1", "art", "10", Instant.parse("2024-01-03T00:00:00Z"));
+        assertThrows(org.springframework.dao.OptimisticLockingFailureException.class,
+                () -> inventoryService.proceedInventoryUpdateEvent(event));
     }
 }

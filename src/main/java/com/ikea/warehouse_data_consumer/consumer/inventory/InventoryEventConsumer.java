@@ -1,6 +1,7 @@
 package com.ikea.warehouse_data_consumer.consumer.inventory;
 
 import com.ikea.warehouse_data_consumer.data.event.InventoryUpdateEvent;
+import com.ikea.warehouse_data_consumer.data.event.KafkaKeyValueRecord;
 import com.ikea.warehouse_data_consumer.data.exception.ArticleDocumentMongoWriteException;
 import com.ikea.warehouse_data_consumer.service.InventoryService;
 import com.ikea.warehouse_data_consumer.service.KafkaProducerService;
@@ -16,8 +17,6 @@ import org.springframework.retry.annotation.Retryable;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
-import java.util.Map;
-import java.util.stream.Collectors;
 
 @Slf4j
 @Service
@@ -43,6 +42,7 @@ public class InventoryEventConsumer {
             containerFactory = "batchKafkaListenerContainerFactoryInventory"
     )
     public void consume(List<InventoryUpdateEvent> inventoryUpdateEventList, Acknowledgment ack) {
+        log.info("BATCH CONSUMER Received inventory update event list size={}", inventoryUpdateEventList.size());
         if (ObjectUtils.isEmpty(inventoryUpdateEventList)) {
             log.warn("Received empty inventory update inventoryUpdateEventList; acking.");
             ack.acknowledge();
@@ -53,13 +53,16 @@ public class InventoryEventConsumer {
             ack.acknowledge();
         } catch (ArticleDocumentMongoWriteException ex) {
             // Handle known business exception locally to prevent container-level retries
-            Map<String, InventoryUpdateEvent> retryableEventMap = ex.getFailedEvents()
-                    .stream()
-                    .collect(Collectors.toMap(InventoryUpdateEvent::artId, event -> event));
 
-            Map<String, InventoryUpdateEvent> nonRetryableEventMap = ex.getCriteriaNotMatchedEvents()
+            List<KafkaKeyValueRecord> retryableEventMap = ex.getFailedEvents()
                     .stream()
-                    .collect(Collectors.toMap(InventoryUpdateEvent::artId, event -> event));
+                    .map(event -> new KafkaKeyValueRecord(event.artId(), event))
+                    .toList();
+
+            List<KafkaKeyValueRecord> nonRetryableEventMap = ex.getCriteriaNotMatchedEvents()
+                    .stream()
+                    .map(event -> new KafkaKeyValueRecord(event.artId(), event))
+                    .toList();
 
             log.error("Recovering from CustomMongoWriteException; with retryable event size={}, non-retryable event size={}",
                     ObjectUtils.isEmpty(retryableEventMap) ? 0 : retryableEventMap.size(),
@@ -77,8 +80,9 @@ public class InventoryEventConsumer {
     public void recover(Exception exception, List<InventoryUpdateEvent> eventList, Acknowledgment ack) {
         log.error("Recovering from Exception; events size={}",
                 ObjectUtils.isEmpty(eventList) ? 0 : eventList.size(), exception);
-        kafkaProducerService.sendBatch(errorTopic, eventList.stream()
-                .collect(Collectors.toMap(InventoryUpdateEvent::artId, event -> event)));
+        List<KafkaKeyValueRecord> kafkaKeyValueRecords = eventList.stream().map(event -> new KafkaKeyValueRecord(event.artId(), event))
+                .toList();
+        kafkaProducerService.sendBatch(errorTopic, kafkaKeyValueRecords);
         ack.acknowledge();
     }
 }

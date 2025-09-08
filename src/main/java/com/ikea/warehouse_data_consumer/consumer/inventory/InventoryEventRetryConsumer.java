@@ -6,6 +6,7 @@ import com.ikea.warehouse_data_consumer.service.KafkaProducerService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.kafka.support.Acknowledgment;
 import org.springframework.retry.annotation.Backoff;
@@ -26,6 +27,7 @@ public class InventoryEventRetryConsumer {
 
     @Retryable(
             maxAttempts = 3,
+            noRetryFor = {OptimisticLockingFailureException.class},
             backoff = @Backoff(delay = 50, multiplier = 2.0)
     )
     @KafkaListener(
@@ -33,6 +35,7 @@ public class InventoryEventRetryConsumer {
             containerFactory = "kafkaListenerContainerFactoryInventory"
     )
     public void consume(InventoryUpdateEvent inventoryUpdateEvent, Acknowledgment ack) {
+        log.info("RETRY CONSUMER Received inventory update event; artId={}", inventoryUpdateEvent.artId());
         inventoryService.proceedInventoryUpdateEvent(inventoryUpdateEvent);
         ack.acknowledge();
     }

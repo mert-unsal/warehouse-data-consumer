@@ -1,13 +1,10 @@
-package com.ikea.warehouse_data_consumer.service.builder;
+package com.ikea.warehouse_data_consumer.builder;
 
 import com.ikea.warehouse_data_consumer.data.event.InventoryUpdateEvent;
+import com.mongodb.client.model.*;
 import org.apache.commons.lang3.ObjectUtils;
 import org.bson.Document;
 import org.bson.conversions.Bson;
-import com.mongodb.client.model.UpdateOneModel;
-import com.mongodb.client.model.UpdateOptions;
-import com.mongodb.client.model.Filters;
-import com.mongodb.client.model.Updates;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -21,8 +18,8 @@ public class InventoryBulkOperationBuilder {
     /**
      * Convert a list of InventoryUpdateEvent into UpdateOneModel operations with upsert enabled.
      */
-    public List<com.mongodb.client.model.WriteModel<Document>> build(List<InventoryUpdateEvent> eventList) {
-        List<com.mongodb.client.model.WriteModel<Document>> bulkOperations = new ArrayList<>();
+    public List<WriteModel<Document>> build(List<InventoryUpdateEvent> eventList) {
+        List<WriteModel<Document>> bulkOperations = new ArrayList<>();
         if (ObjectUtils.isEmpty(eventList)) {
             return bulkOperations;
         }
@@ -30,7 +27,8 @@ public class InventoryBulkOperationBuilder {
             Bson updates = Updates.combine(
                     Updates.set("name", event.name()),
                     Updates.set("stock", event.stock()),
-                    Updates.set("fileCreatedAt", event.fileCreatedAt())
+                    Updates.set("fileCreatedAt", event.fileCreatedAt()),
+                    Updates.inc("version", 1L)
             );
 
             bulkOperations.add(new UpdateOneModel<>(

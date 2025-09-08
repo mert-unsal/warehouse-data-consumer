@@ -1,5 +1,6 @@
 package com.ikea.warehouse_data_consumer.service.builder;
 
+import com.ikea.warehouse_data_consumer.builder.InventoryBulkOperationBuilder;
 import com.ikea.warehouse_data_consumer.data.event.InventoryUpdateEvent;
 import com.mongodb.client.model.UpdateOneModel;
 import com.mongodb.client.model.WriteModel;
@@ -13,6 +14,7 @@ import java.util.List;
 import static org.junit.jupiter.api.Assertions.*;
 
 class InventoryBulkOperationBuilderTest {
+
 
     @Test
     void build_shouldReturnEmptyList_whenInputEmpty() {
