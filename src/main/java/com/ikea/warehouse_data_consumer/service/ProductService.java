@@ -1,6 +1,6 @@
 package com.ikea.warehouse_data_consumer.service;
 
-import com.ikea.warehouse_data_consumer.data.document.ArticleDocument;
+import com.ikea.warehouse_data_consumer.data.document.ProductDocument;
 import com.ikea.warehouse_data_consumer.data.event.ProductUpdateEvent;
 import com.ikea.warehouse_data_consumer.data.exception.ProductDocumentMongoWriteException;
 import com.mongodb.MongoBulkWriteException;
@@ -72,7 +72,7 @@ public class ProductService {
                 ));
             }
 
-            BulkWriteResult bulkWriteResult = mongoTemplate.getCollection(mongoTemplate.getCollectionName(ArticleDocument.class))
+            BulkWriteResult bulkWriteResult = mongoTemplate.getCollection(mongoTemplate.getCollectionName(ProductDocument.class))
                                                     .bulkWrite(bulkOperations, new BulkWriteOptions().ordered(false));
 
             List<ProductUpdateEvent> notMatchedEvents = getNotMatchedCriteria(productUpdateEventList, bulkWriteResult);

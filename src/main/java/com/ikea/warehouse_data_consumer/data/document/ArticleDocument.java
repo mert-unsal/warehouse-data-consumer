@@ -12,8 +12,8 @@ import org.springframework.data.mongodb.core.mapping.Document;
 import java.time.Instant;
 
 @Builder(toBuilder = true)
-@Document(collection = "ArticleInventory")
-@Schema(description = "Inventory item representing a warehouse article")
+@Document(collection = "articles")
+@Schema(description = "Article document representing a warehouse article inventory item")
 public record ArticleDocument(
     @Id
     @Schema(description = "Unique article identifier", example = "1")
