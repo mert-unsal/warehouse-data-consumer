@@ -1,5 +1,38 @@
 version: '3.9'
 services:
+  mongo:
+    image: mongo:6.0.14
+    container_name: mongo
+    command: ["--replSet", "rs0", "--bind_ip_all"]
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+  # ... existing code ...
+  mongo-init-replica:
+    image: mongo:6.0.14
+    depends_on:
+      mongo:
+        condition: service_healthy
+    restart: "no"
+    entrypoint: ["sh", "-c"]
+    command:
+      - >
+        mongosh --host mongo:27017 --quiet --eval '
+        try {
+          rs.initiate({ _id: "rs0", members: [ { _id: 0, host: "mongo:27017" } ] });
+        } catch(e) { print(e); }
+        let s = rs.status(); printjson(s);'
+
+
+
   kafka:
     image: confluentinc/cp-kafka:latest
     container_name: kafka
@@ -36,3 +69,78 @@ services:
       KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:29092
       DYNAMIC_CONFIG_ENABLED: true
     restart: unless-stopped
+
+  warehouse-query-api:
+    build: ./warehouse-query-api
+    container_name: warehouse-query-api
+    depends_on:
+      - mongo
+      - kafka
+    environment:
+      - SPRING_PROFILES_ACTIVE=logging,management,mongo,kafka
+      - SPRING_DATA_MONGODB_URI=mongodb://mongo:27017/ikea?replicaSet=rs0&readPreference=primaryPreferred&retryWrites=true&w=majority
+      - MONGODB_URI=mongodb://mongo:27017/ikea?replicaSet=rs0&readPreference=primaryPreferred&retryWrites=true&w=majority
+      - MONGODB_DATABASE=ikea
+      - SPRING_DATA_MONGODB_DATABASE=ikea
+      - KAFKA_BOOTSTRAP_SERVERS=kafka:29092
+      - PORT=8083
+    ports:
+      - "8083:8083"
+    restart: unless-stopped
+
+  warehouse-command-api:
+    build: ./warehouse-command-api
+    container_name: warehouse-command-api
+    depends_on:
+      - mongo
+      - kafka
+    environment:
+      - SPRING_PROFILES_ACTIVE=logging,management,mongo,kafka
+      - SPRING_DATA_MONGODB_URI=mongodb://mongo:27017/ikea?replicaSet=rs0&retryWrites=true&w=majority
+      - MONGODB_URI=mongodb://mongo:27017/ikea?replicaSet=rs0&retryWrites=true&w=majority
+      - MONGODB_DATABASE=ikea
+      - SPRING_DATA_MONGODB_DATABASE=ikea
+      - KAFKA_BOOTSTRAP_SERVERS=kafka:29092
+      - PORT=8082
+    ports:
+      - "8082:8082"
+    restart: unless-stopped
+
+  warehouse-data-ingestion-service:
+    build: ./warehouse-data-ingestion-service
+    container_name: warehouse-data-ingestion-service
+    depends_on:
+      - mongo
+      - kafka
+    environment:
+      - SPRING_PROFILES_ACTIVE=logging,management,mongo,kafka
+      - SPRING_DATA_MONGODB_URI=mongodb://mongo:27017/ikea?replicaSet=rs0&retryWrites=true&w=majority
+      - MONGODB_URI=mongodb://mongo:27017/ikea?replicaSet=rs0&retryWrites=true&w=majority
+      - MONGODB_DATABASE=ikea
+      - SPRING_DATA_MONGODB_DATABASE=ikea
+      - KAFKA_BOOTSTRAP_SERVERS=kafka:29092
+      - PORT=8081
+    ports:
+      - "8081:8081"
+    restart: unless-stopped
+
+  warehouse-data-consumer:
+    build: ./warehouse-data-consumer
+    container_name: warehouse-data-consumer
+    depends_on:
+      - mongo
+      - kafka
+    environment:
+      - SPRING_PROFILES_ACTIVE=logging,management,mongo,kafka
+      - SPRING_DATA_MONGODB_URI=mongodb://mongo:27017/ikea?replicaSet=rs0&readPreference=primaryPreferred&retryWrites=true&w=majority
+      - MONGODB_URI=mongodb://mongo:27017/ikea?replicaSet=rs0&readPreference=primaryPreferred&retryWrites=true&w=majority
+      - MONGODB_DATABASE=ikea
+      - SPRING_DATA_MONGODB_DATABASE=ikea
+      - KAFKA_BOOTSTRAP_SERVERS=kafka:29092
+      - PORT=8080
+    ports:
+      - "8080:8080"
+    restart: unless-stopped
+
+volumes:
+  mongo_data:
