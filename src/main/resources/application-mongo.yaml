@@ -6,7 +6,7 @@ spring:
       uri: ${MONGODB_URI:mongodb+srv://mertunsal0_db_user:geWPGbaakEdWNgjT@munsal-cluster.redvguc.mongodb.net/?retryWrites=true&w=majority&appName=munsalCluster}
       database: ${MONGODB_DATABASE:ikea}
 
-# Expose MongoDB health indicator explicitly when management profile is not active
+# Expose MongoDB health indicator
 management:
   health:
     mongo:

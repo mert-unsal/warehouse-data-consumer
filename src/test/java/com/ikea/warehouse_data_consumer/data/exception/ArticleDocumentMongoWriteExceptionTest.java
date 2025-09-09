@@ -14,8 +14,8 @@ class ArticleDocumentMongoWriteExceptionTest {
 
     @Test
     void gettersAndStatusShouldBeSet() {
-        InventoryUpdateEvent e1 = new InventoryUpdateEvent("1", "a", "1", Instant.now());
-        InventoryUpdateEvent e2 = new InventoryUpdateEvent("2", "b", "2", Instant.now());
+        InventoryUpdateEvent e1 = new InventoryUpdateEvent("1", "a", 1L, Instant.now());
+        InventoryUpdateEvent e2 = new InventoryUpdateEvent("2", "b", 2L, Instant.now());
 
         ArticleDocumentMongoWriteException ex = new ArticleDocumentMongoWriteException(List.of(e1), List.of(e2));
 

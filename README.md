@@ -1,227 +1,194 @@
 # IKEA Warehouse Data Consumer
 
-A Spring Boot Kafka consumer application that listens to multiple Kafka topics to persist warehouse data (inventory, productDocuments, and warehouse events) into MongoDB. The application provides REST APIs for data management and warehouse analysis.
+A Spring Boot Kafka consumer application that listens to Kafka topics and persists warehouse data (inventory and product definitions) into MongoDB. This service runs in the background; it does not expose business REST endpoints.
 
 ## Architecture Overview
 
-This application processes three types of data:
-- **Warehouse Events**: General warehouse operations and transactions
-- **Inventory Data**: Article/item stock levels and information
-- **Product Data**: Product definitions with required article compositions
+This application processes two kinds of inputs:
+- **Inventory Updates**: Article/item stock levels and names
+- **Product Updates**: Product definitions with required article compositions
 
 ## Features
 
-- 🔄 **Multi-Topic Kafka Consumer**: Processes different message types from separate topics
-- 📊 **MongoDB Persistence**: Stores all data in MongoDB with proper indexing
-- 🔍 **REST API**: Comprehensive APIs for data access and warehouse analysis
-- 📈 **Production Analysis**: Calculate manufacturing capacity based on inventory
-- 🏗️ **Product Feasibility**: Check if productDocuments can be manufactured with current stock
-- 📚 **API Documentation**: Auto-generated Swagger/OpenAPI documentation
-- 🔧 **Error Handling**: Robust error handling with raw message preservation
+- 🔄 **Multi-topic Kafka consumer**: Consumes product and inventory messages from dedicated topics
+- 📊 **MongoDB persistence**: Stores articles and products with sensible indexes (name index; nested containArticles.artId compound index)
+- 🧵 **Retry/Error topics support**: Separate configurable topics for retry and error handling (see application-kafka.yaml)
+- 🩺 **Operational endpoints**: Actuator health endpoint; OpenAPI UI available but no REST controllers in this service
+- 📜 **Structured logging & telemetry**: Logback JSON encoder and OpenTelemetry auto-instrumentation
+- 🐳 **Container-ready**: Dockerfiles and docker-compose for local orchestration
 
 ## Data Models
 
-### WarehouseMessage
+### Kafka payloads (consumed)
+
+- InventoryUpdateEvent
 ```json
 {
-  "messageId": "MSG001",
-  "warehouseId": "WH001", 
-  "productId": "PROD123",
-  "action": "STOCK_IN",
-  "quantity": 100,
-  "location": "A1-B2",
-  "timestamp": "2025-09-05T12:00:00"
+  "artId": "1",
+  "name": "table leg",
+  "stock": 50,
+  "fileCreatedAt": "2025-09-05T12:00:00Z"
 }
 ```
 
-### InventoryItem
+- ProductUpdateEvent
 ```json
 {
-  "art_id": "1",
-  "name": "leg",
-  "stock": "12"
-}
-```
-
-### Product
-```json
-{
-  "id": "TABLE001",
   "name": "Dining Table",
   "contain_articles": [
-    {
-      "art_id": "1",
-      "amount_of": "4"
-    },
-    {
-      "art_id": "2", 
-      "amount_of": "1"
-    }
-  ]
+    { "art_id": "1", "amount_of": 4 },
+    { "art_id": "2", "amount_of": 1 }
+  ],
+  "fileCreatedAt": "2025-09-05T12:00:00Z"
+}
+```
+
+Notes:
+- Article requirements use fields art_id and amount_of on the wire; they map to ArticleAmount(artId, amountOf) in code.
+
+### MongoDB documents (stored)
+
+- articles collection (ArticleDocument)
+```json
+{
+  "_id": "1",
+  "name": "table leg",
+  "stock": 50,
+  "lastMessageId": null,
+  "version": 0,
+  "createdDate": "2025-09-05T12:00:01Z",
+  "lastModifiedDate": "2025-09-05T12:00:01Z",
+  "fileCreatedAt": "2025-09-05T12:00:00Z"
+}
+```
+
+- products collection (ProductDocument)
+```json
+{
+  "_id": "64f0c1...",
+  "name": "Dining Table",
+  "containArticles": [
+    { "artId": "1", "amountOf": 4 },
+    { "artId": "2", "amountOf": 1 }
+  ],
+  "version": 0,
+  "createdDate": "2025-09-05T12:00:02Z",
+  "lastModifiedDate": "2025-09-05T12:00:02Z",
+  "fileCreatedAt": "2025-09-05T12:00:00Z"
 }
 ```
 
 ## Prerequisites
 
 - Java 21+
-- Maven 3.6+
-- Apache Kafka 2.8+
-- MongoDB 4.4+
+- Maven 3.9+
+- Docker 24+ and Docker Compose
 
 ## Getting Started
 
-### 1. Start Required Services
+### 1. Start Required Services (via Docker Compose)
+From the repository root, this service is orchestrated together with MongoDB, Kafka and other apps.
 
-#### MongoDB
 ```bash
-# Using Docker
-docker run -d -p 27017:27017 --name mongodb mongo:latest
+# Build and start everything
+docker compose up -d --build
 
-# Or install locally and run
-mongod
+# Or start only this service (and its deps)
+docker compose up -d --build warehouse-data-consumer
 ```
 
-#### Apache Kafka
-```bash
-# Start Zookeeper
-bin/zookeeper-server-start.sh config/zookeeper.properties
+> Services and ports (by default):
+> - MongoDB: localhost:27017
+> - Kafka broker (KRaft): localhost:9092 (internal: kafka:29092)
+> - Kafka UI: http://localhost:8090
+> - Warehouse Data Consumer: http://localhost:8080
 
-# Start Kafka
-bin/kafka-server-start.sh config/server.properties
-
-# Create topics
-bin/kafka-topics.sh --create --topic warehouse-events --bootstrap-server localhost:9092
-bin/kafka-topics.sh --create --topic inventory-events --bootstrap-server localhost:9092
-bin/kafka-topics.sh --create --topic inventory-updates --bootstrap-server localhost:9092
-bin/kafka-topics.sh --create --topic productDocuments-events --bootstrap-server localhost:9092
-bin/kafka-topics.sh --create --topic productDocument-updates --bootstrap-server localhost:9092
-```
+Topics are created/managed manually as needed; defaults are read from application-kafka.yaml. You can also use Kafka UI to create them quickly.
 
 ### 2. Configure Application
 
-Update `src/main/resources/application.properties`:
+Configuration is YAML-based and profile-driven. By default, the following profiles are active: `default,logging,management,kafka,mongo` (see application.yaml).
 
-```properties
-# MongoDB Configuration
-spring.data.mongodb.host=localhost
-spring.data.mongodb.port=27017
-spring.data.mongodb.database=warehouse_db
+Key files:
+- src/main/resources/application.yaml (common settings, server.port=8080)
+- src/main/resources/application-kafka.yaml (Kafka topics and consumer settings)
+- src/main/resources/application-mongo.yaml (MongoDB connection)
 
-# Kafka Configuration
-spring.kafka.bootstrap-servers=localhost:9092
-spring.kafka.consumer.group-id=warehouse-consumer-group
+You can override via environment variables (used in Docker Compose):
 
-# Kafka Topics
-spring.kafka.consumer.topic=warehouse-events
-spring.kafka.consumer.inventory-topic=inventory-events
-spring.kafka.consumer.inventory-update-topic=inventory-updates
-spring.kafka.consumer.productDocuments-topic=productDocuments-events
-spring.kafka.consumer.productDocument-update-topic=productDocument-updates
+```bash
+# MongoDB
+MONGODB_URI=mongodb://localhost:27017/ikea
+MONGODB_DATABASE=ikea
+
+# Kafka
+KAFKA_BOOTSTRAP_SERVERS=localhost:9092
+KAFKA_CONSUMER_GROUP_ID=warehouse-data-ingestion-group
+
+# App port
+PORT=8080
 ```
+
+Kafka topics (from application-kafka.yaml; override via env):
+- Product topics:
+  - KAFKA_TOPIC_PRODUCT (default: ikea.warehouse.product.update.topic)
+  - KAFKA_TOPIC_PRODUCT_RETRY (default: ikea.warehouse.product.update.topic.retry)
+  - KAFKA_TOPIC_PRODUCT_ERROR (default: ikea.warehouse.product.update.topic.error)
+- Inventory topics:
+  - KAFKA_TOPIC_INVENTORY (default: ikea.warehouse.inventory.update.topic)
+  - KAFKA_TOPIC_INVENTORY_RETRY (default: ikea.warehouse.inventory.update.topic.retry)
+  - KAFKA_TOPIC_INVENTORY_ERROR (default: ikea.warehouse.inventory.update.topic.error)
 
 ### 3. Run the Application
 
 ```bash
-# Compile and run
-mvn spring-boot:run
+# Compile and run with active profiles (for local without Docker)
+mvn spring-boot:run -Dspring-boot.run.profiles=default,logging,management,kafka,mongo \
+  -Dspring-boot.run.jvmArguments="--enable-preview"
 
 # Or build and run JAR
 mvn clean package
-java -jar target/warehouse-data-consumer-1.0-SNAPSHOT.jar
+java --enable-preview -jar target/warehouse-data-consumer-1.0-SNAPSHOT.jar
 ```
 
-The application will start on port 8080.
+The application starts on port 8080 (override via PORT env).
 
-## API Endpoints
+## HTTP Endpoints
 
-### Warehouse Messages
-- `GET /api/warehouse-messages` - Get all warehouse messages (paginated)
-- `GET /api/warehouse-messages/{id}` - Get message by ID
-- `GET /api/warehouse-messages/warehouse/{warehouseId}` - Filter by warehouse
-- `GET /api/warehouse-messages/productDocument/{productId}` - Filter by productDocument
-- `GET /api/warehouse-messages/count` - Get total message count
+This service does not expose business REST APIs. It is a background consumer that:
+- Listens to Kafka topics for product and inventory updates
+- Persists normalized data into MongoDB
 
-### Inventory Management
-- `GET /api/inventory` - Get all inventory items (paginated)
-- `GET /api/inventory/{artId}` - Get item by article ID
-- `GET /api/inventory/search?name={name}` - Search by name
-- `GET /api/inventory/in-stock?minStock={amount}` - Items above stock threshold
-- `POST /api/inventory` - Create/update inventory item
-- `DELETE /api/inventory/{artId}` - Delete inventory item
-
-### Product Management
-- `GET /api/productDocuments` - Get all productDocuments (paginated)
-- `GET /api/productDocuments/{id}` - Get productDocument by ID
-- `GET /api/productDocuments/search?name={name}` - Search by name
-- `GET /api/productDocuments/by-article/{artId}` - Find productDocuments using specific article
-- `POST /api/productDocuments` - Create/update productDocument
-- `DELETE /api/productDocuments/{id}` - Delete productDocument
-
-### Warehouse Analysis
-- `GET /api/analysis/can-manufacture/{productId}` - Check if productDocument can be manufactured
-- `GET /api/analysis/production-capacity/{productId}` - Calculate max production quantity
-- `GET /api/analysis/manufacturable-productDocuments` - Get all manufacturable productDocuments
-- `GET /api/analysis/inventory-status/{productId}` - Detailed inventory status for productDocument
-
-### Health & Documentation
-- `GET /api/warehouse-messages/health` - Application health check
-- `GET /swagger-ui.html` - Swagger UI documentation
-- `GET /api-docs` - OpenAPI specification
+Available HTTP endpoints are limited to operational endpoints only:
+- GET /actuator/health — liveness/readiness
+- GET /swagger-ui.html and GET /api-docs — provided by springdoc if enabled, but there are no controllers documented (useful mainly for future extensions)
 
 ## Usage Examples
 
 ### Send Test Messages via Kafka
 
-#### Warehouse Event
+#### Product update event
 ```bash
-echo '{"messageId":"MSG001","warehouseId":"WH001","productId":"TABLE001","action":"STOCK_IN","quantity":10,"location":"A1-B2"}' | \
-kafka-console-producer.sh --topic warehouse-events --bootstrap-server localhost:9092
+echo '{"id":"TABLE001","name":"Dining Table","contain_articles":[{"art_id":"1","amount_of":"4"},{"art_id":"2","amount_of":"1"}]}' | \
+  kafka-console-producer.sh --topic ${KAFKA_TOPIC_PRODUCT:-ikea.warehouse.product.update.topic} --bootstrap-server localhost:9092
 ```
 
-#### Inventory Data
+#### Inventory update event
 ```bash
-echo '{"inventory":[{"art_id":"1","name":"table leg","stock":"50"},{"art_id":"2","name":"table top","stock":"25"}]}' | \
-kafka-console-producer.sh --topic inventory-events --bootstrap-server localhost:9092
-```
-
-#### Product Definition
-```bash
-echo '{"productDocuments":[{"id":"TABLE001","name":"Dining Table","contain_articles":[{"art_id":"1","amount_of":"4"},{"art_id":"2","amount_of":"1"}]}]}' | \
-kafka-console-producer.sh --topic productDocuments-events --bootstrap-server localhost:9092
-```
-
-### REST API Usage
-
-#### Check Production Capacity
-```bash
-curl http://localhost:8080/api/analysis/production-capacity/TABLE001
-```
-Response: `12` (can manufacture 12 tables with current inventory)
-
-#### Get Manufacturable Products
-```bash
-curl http://localhost:8080/api/analysis/manufacturable-productDocuments
-```
-
-#### Add Inventory Item
-```bash
-curl -X POST http://localhost:8080/api/inventory \
-  -H "Content-Type: application/json" \
-  -d '{"art_id":"3","name":"table screw","stock":"100"}'
+echo '{"art_id":"1","name":"table leg","stock":"50"}' | \
+  kafka-console-producer.sh --topic ${KAFKA_TOPIC_INVENTORY:-ikea.warehouse.inventory.update.topic} --bootstrap-server localhost:9092
 ```
 
 ## Monitoring & Logging
 
-The application provides comprehensive logging for:
+The application provides logging for:
 - Kafka message consumption
 - Database operations
-- API requests
 - Error handling
 
 Logs are configured to show:
 - Message processing status
 - MongoDB persistence confirmations
-- Production analysis calculations
 - Error details with stack traces
 
 ## Development

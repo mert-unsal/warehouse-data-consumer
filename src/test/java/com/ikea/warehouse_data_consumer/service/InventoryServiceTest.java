@@ -58,7 +58,7 @@ class InventoryServiceTest {
 
     @Test
     void proceedInventoryUpdateEvent_shouldCallUpdateOneWithUpsert() {
-            InventoryUpdateEvent event = new InventoryUpdateEvent("1", "art", "10", Instant.parse("2024-01-01T00:00:00Z"));
+            InventoryUpdateEvent event = new InventoryUpdateEvent("1", "art", 10L, Instant.parse("2024-01-01T00:00:00Z"));
 
             inventoryService.proceedInventoryUpdateEvent(event);
 
@@ -67,7 +67,7 @@ class InventoryServiceTest {
 
         @Test
         void proceedInventoryUpdateEvent_shouldIncludeVersionOperatorsInUpdate() {
-            InventoryUpdateEvent event = new InventoryUpdateEvent("1", "art", "10", Instant.parse("2024-01-01T00:00:00Z"));
+            InventoryUpdateEvent event = new InventoryUpdateEvent("1", "art", 10L, Instant.parse("2024-01-01T00:00:00Z"));
 
             inventoryService.proceedInventoryUpdateEvent(event);
 
@@ -90,8 +90,8 @@ class InventoryServiceTest {
 
     @Test
     void proceedInventoryUpdateBatchEvent_shouldThrowWhenNotMatchedCriteriaExists() {
-        InventoryUpdateEvent e1 = new InventoryUpdateEvent("1", "a", "1", Instant.parse("2024-01-01T00:00:00Z"));
-        InventoryUpdateEvent e2 = new InventoryUpdateEvent("2", "b", "2", Instant.parse("2024-01-02T00:00:00Z"));
+        InventoryUpdateEvent e1 = new InventoryUpdateEvent("1", "a", 1L, Instant.parse("2024-01-01T00:00:00Z"));
+        InventoryUpdateEvent e2 = new InventoryUpdateEvent("2", "b", 2L, Instant.parse("2024-01-02T00:00:00Z"));
 
         BulkWriteResult result = mock(BulkWriteResult.class);
         when(result.getUpserts()).thenReturn(List.of(new BulkWriteUpsert(0, null)));
@@ -106,8 +106,8 @@ class InventoryServiceTest {
 
     @Test
     void proceedInventoryUpdateBatchEvent_shouldMapBulkWriteException() {
-        InventoryUpdateEvent e1 = new InventoryUpdateEvent("1", "a", "1", Instant.parse("2024-01-01T00:00:00Z"));
-        InventoryUpdateEvent e2 = new InventoryUpdateEvent("2", "b", "2", Instant.parse("2024-01-02T00:00:00Z"));
+        InventoryUpdateEvent e1 = new InventoryUpdateEvent("1", "a", 1L, Instant.parse("2024-01-01T00:00:00Z"));
+        InventoryUpdateEvent e2 = new InventoryUpdateEvent("2", "b", 2L, Instant.parse("2024-01-02T00:00:00Z"));
 
         BulkWriteResult result = mock(BulkWriteResult.class);
         when(result.getUpserts()).thenReturn(List.of());
@@ -137,7 +137,7 @@ class InventoryServiceTest {
         com.mongodb.client.result.UpdateResult updateResult = com.mongodb.client.result.UpdateResult.acknowledged(0L, 0L, null);
         when(collection.updateOne(any(Bson.class), any(Bson.class), any(com.mongodb.client.model.UpdateOptions.class))).thenReturn(updateResult);
 
-        InventoryUpdateEvent event = new InventoryUpdateEvent("1", "art", "10", Instant.parse("2024-01-03T00:00:00Z"));
+        InventoryUpdateEvent event = new InventoryUpdateEvent("1", "art", 10L, Instant.parse("2024-01-03T00:00:00Z"));
         assertThrows(org.springframework.dao.OptimisticLockingFailureException.class,
                 () -> inventoryService.proceedInventoryUpdateEvent(event));
     }

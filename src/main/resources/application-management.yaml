@@ -1,4 +1,3 @@
-# Management/Actuator Configuration Profile
 management:
   endpoints:
     web:
